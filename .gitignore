@@ -1,0 +1,9 @@
+# Git ignore patterns
+
+# Bazel
+/bazel-*
+/user.bazelrc
+/rust-project.json
+
+# Cargo
+/target

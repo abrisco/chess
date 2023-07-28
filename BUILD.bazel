@@ -1,0 +1,16 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@crate_index//:defs.bzl", "all_crate_deps")
+
+rust_binary(
+    name = "tactics",
+    srcs = glob(["src/**/*.rs"]),
+    # Bevy relies on the existence of `Cargo.toml` as a potential source
+    # of metadata. https://github.com/bevyengine/bevy/pull/9207
+    compile_data = ["Cargo.toml"],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+    ),
+    deps = all_crate_deps(
+        normal = True,
+    ),
+)

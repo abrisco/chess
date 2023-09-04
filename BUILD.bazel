@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 load("@crate_index//:defs.bzl", "all_crate_deps")
 
 rust_binary(
@@ -13,4 +13,9 @@ rust_binary(
     deps = all_crate_deps(
         normal = True,
     ),
+)
+
+rust_test(
+    name = "tactics_test",
+    crate = ":tactics",
 )

@@ -39,7 +39,6 @@ impl Default for CameraSettings {
     }
 }
 
-
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
@@ -85,84 +84,82 @@ impl GamePlugin {
 
     fn update_camera(
         mut camera: Single<&mut Transform, With<Camera>>,
-        camera_settings: Res<CameraSettings>,
         mouse_buttons: Res<ButtonInput<MouseButton>>,
         mouse_motion: Res<AccumulatedMouseMotion>,
         keyboard_input: Res<ButtonInput<KeyCode>>,
-        time: Res<Time>,
     ) {
+        // Reset position when "R" is pressed
         if keyboard_input.pressed(KeyCode::KeyR) {
             camera.translation = Vec3::new(-2.5, 4.5, 9.0);
             camera.look_at(Vec3::ZERO, Vec3::Y);
         }
 
-        if !mouse_buttons.pressed(MouseButton::Left) {
-            return
-        }
+        // If no mouse buttons are pressed, don't update the camera.
+        let delta = if mouse_buttons.pressed(MouseButton::Left) {
+            mouse_motion.delta
+        } else if keyboard_input.any_pressed([
+            KeyCode::ArrowUp,
+            KeyCode::ArrowDown,
+            KeyCode::ArrowLeft,
+            KeyCode::ArrowRight,
+        ]) {
+            Vec2::new(
+                if keyboard_input.pressed(KeyCode::ArrowRight) {
+                    3.0
+                } else if keyboard_input.pressed(KeyCode::ArrowLeft) {
+                    -3.0
+                } else {
+                    0.0
+                },
+                if keyboard_input.pressed(KeyCode::ArrowUp) {
+                    3.0
+                } else if keyboard_input.pressed(KeyCode::ArrowDown) {
+                    -3.0
+                } else {
+                    0.0
+                },
+            )
+        } else {
+            return;
+        };
 
-        // Build the rotation quaternion
-        let delta = mouse_motion.delta;
-        println!("{:?}", delta);
-        let scale = 0.01;
-        let yaw   = Quat::from_axis_angle(Vec3::X, -delta.y * scale);   // Up/Down
-        let pitch = Quat::from_axis_angle(Vec3::Y, -delta.x * scale);  // Left/Right
-        let rotation = yaw * pitch; // Apply pitch first, then yaw
+        // Constants
+        let sensitivity = 0.01;
 
         // Placeholder constant focus
         let focus = Vec3::ZERO;
 
-        // Compute offset for rotation
+        // Current offset from focus
         let offset = camera.translation - focus;
 
-        let position = rotation * offset;
-        println!("POSITION: {:?}", position);
+        // Compute the new rotation based on mouse input
+        let forward = -offset.normalize(); // viewing direction is toward focus
 
-        let up = rotation * camera.up();
-        camera.translation = position;
-        // camera.rotation = rotation;
+        // Use the camera's current local up to avoid instability
+        let local_up = camera.rotation * Vec3::Y;
+
+        // If forward is too close to up, fall back to another axis. This occurs because
+        // as two vectors approach being identical their cross product nears zero.
+        let pole_threshold = 0.999;
+        let fallback_up = camera.rotation * Vec3::Z;
+        let view_up = if forward.dot(local_up).abs() > pole_threshold {
+            fallback_up
+        } else {
+            local_up
+        };
+
+        let right = forward.cross(view_up).normalize();
+        let up = right.cross(forward).normalize();
+
+        // Compute pitch and yaw
+        let pitch = Quat::from_axis_angle(right, -delta.y * sensitivity);
+        let yaw = Quat::from_axis_angle(up, -delta.x * sensitivity);
+        let rotation = yaw * pitch;
+
+        // Update camera position
+        camera.translation = focus + (rotation * offset);
+
+        // Update look_at using up as it's a safe reference point.
         camera.look_at(focus, up);
-
-
-        // Do Rotation
-
-        // let camera_translation = camera.translation.clone();
-        // let camera_rotation = camera.rotation.clone();
-
-        // let delta = mouse_motion.delta;
-        // let mut delta_roll = 0.0;
-
-        // if mouse_buttons.pressed(MouseButton::Left) {
-        //     delta_roll -= 1.0;
-        // }
-        // if mouse_buttons.pressed(MouseButton::Right) {
-        //     delta_roll += 1.0;
-        // }
-
-        // // Mouse motion is one of the few inputs that should not be multiplied by delta time,
-        // // as we are already receiving the full movement since the last frame was rendered. Multiplying
-        // // by delta time here would make the movement slower that it should be.
-        // let delta_pitch = delta.y * camera_settings.pitch_speed;
-        // let delta_yaw = delta.x * camera_settings.yaw_speed;
-
-        // // // Conversely, we DO need to factor in delta time for mouse button inputs.
-        // // delta_roll *= camera_settings.roll_speed * time.delta_secs();
-
-        // // Obtain the existing pitch, yaw, and roll values from the transform.
-        // let (yaw, pitch, roll) = camera.rotation.to_euler(EulerRot::YXZ);
-
-        // // Establish the new yaw and pitch, preventing the pitch value from exceeding our limits.
-        // let pitch = (pitch + delta_pitch).clamp(
-        //     camera_settings.pitch_range.start,
-        //     camera_settings.pitch_range.end,
-        // );
-        // let roll = roll + delta_roll;
-        // let yaw = yaw + delta_yaw;
-        // Quat::from
-        // camera.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll);
-
-        // // Adjust the translation to maintain the correct orientation toward the orbit target.
-        // // In our example it's a static target, but this could easily be customized.
-        // let target = Vec3::ZERO;
-        // camera.translation = target - camera.forward() * camera_settings.orbit_distance;
     }
 }

@@ -1,9 +1,4 @@
-use std::f32::consts::FRAC_PI_2;
-use std::ops::Range;
-
-use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::AccumulatedMouseMotion;
-use bevy::math::VectorSpace;
 use bevy::prelude::*;
 
 fn main() {
@@ -33,17 +28,17 @@ impl GamePlugin {
         mut materials: ResMut<Assets<StandardMaterial>>,
         asset_server: Res<AssetServer>,
     ) {
-        // circular base
-        commands.spawn((
-            Mesh3d(meshes.add(Circle::new(4.0))),
-            MeshMaterial3d(materials.add(Color::WHITE)),
-            Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        ));
+        // circular base plane
+        // commands.spawn((
+        //     Mesh3d(meshes.add(Circle::new(4.0))),
+        //     MeshMaterial3d(materials.add(Color::WHITE)),
+        //     Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+        // ));
 
         // Board
-        commands.spawn(SceneRoot(asset_server.load(
-            GltfAssetLabel::Scene(0).from_asset("models/chess_board.glb")
-        )));
+        commands.spawn(SceneRoot(
+            asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/chess_board.glb")),
+        ));
 
         // light
         commands.spawn((
@@ -53,10 +48,12 @@ impl GamePlugin {
             },
             Transform::from_xyz(4.0, 8.0, 9.0),
         ));
+
         // camera
         commands.spawn((
             Camera3d::default(),
-            Transform::from_xyz(CAMERA_START_X, CAMERA_START_Y, CAMERA_START_Z).looking_at(Vec3::ZERO, Vec3::Y),
+            Transform::from_xyz(CAMERA_START_X, CAMERA_START_Y, CAMERA_START_Z)
+                .looking_at(Vec3::ZERO, Vec3::Y),
         ));
     }
 
@@ -80,7 +77,7 @@ impl GamePlugin {
 
         // If no mouse buttons are pressed, don't update the camera.
         let delta = if mouse_buttons.pressed(MouseButton::Left) {
-            mouse_motion.delta * 0.1
+            mouse_motion.delta * 0.01
         } else if keyboard_input.any_pressed([
             KeyCode::ArrowUp,
             KeyCode::ArrowDown,
@@ -110,23 +107,17 @@ impl GamePlugin {
         // Current offset from focus
         let offset = camera.translation - focus;
 
-        // Compute the new rotation based on mouse input
-        let forward = -offset.normalize(); // viewing direction is toward focus
-
-        // Use the camera's current local up to avoid instability
-        let up = camera.rotation * Vec3::Y;
-        let right = forward.cross(up).normalize();
+        let up = Vec3::Y;
+        let right = Vec3::X;
 
         // Compute pitch and yaw
         let pitch = Quat::from_axis_angle(right, -delta.y);
         let yaw = Quat::from_axis_angle(up, -delta.x);
-        let rotation = yaw * pitch;
+        let rotation = pitch * yaw;
 
         // Update camera position
         camera.translation = focus + (rotation * offset);
 
-        // Set the new lookat after accounting for the change in yaw
-        camera.look_at(focus, pitch * up);
-        println!("{:?}", camera.translation);
+        camera.look_at(focus, up);
     }
 }

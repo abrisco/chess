@@ -24,17 +24,8 @@ impl Plugin for GamePlugin {
 impl GamePlugin {
     fn startup(
         mut commands: Commands,
-        mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
         asset_server: Res<AssetServer>,
     ) {
-        // circular base plane
-        // commands.spawn((
-        //     Mesh3d(meshes.add(Circle::new(4.0))),
-        //     MeshMaterial3d(materials.add(Color::WHITE)),
-        //     Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        // ));
-
         // Board
         commands.spawn(SceneRoot(
             asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/chess_board.glb")),
@@ -108,7 +99,7 @@ impl GamePlugin {
         let offset = camera.translation - focus;
 
         let up = Vec3::Y;
-        let right = Vec3::X;
+        let right = camera.rotation * Vec3::X;
 
         // Compute pitch and yaw
         let pitch = Quat::from_axis_angle(right, -delta.y);
@@ -118,6 +109,10 @@ impl GamePlugin {
         // Update camera position
         camera.translation = focus + (rotation * offset);
 
-        camera.look_at(focus, up);
+        // Compute the camera's up vector while accounting for any yaw (left/right) movement.
+        let camera_up = yaw * camera.rotation * Vec3::Y;
+
+        // Correct the lookat position.
+        camera.look_at(focus, camera_up);
     }
 }

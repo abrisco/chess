@@ -6,6 +6,7 @@ module(
 )
 
 bazel_dep(name = "rules_rust", version = "0.63.0")
+bazel_dep(name = "rules_blender", version = "0.0.1")
 
 RUST_VERSION = "1.88.0"
 

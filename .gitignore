@@ -1,5 +1,8 @@
 # Git ignore patterns
 
+# System
+.DS_Store
+
 # Bazel
 /bazel-*
 /user.bazelrc

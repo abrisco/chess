@@ -87,11 +87,12 @@ impl ChessPiece {
         commands: &mut Commands,
         asset_library: &Res<AssetLibrary>,
         gltf_assets: &Res<Assets<Gltf>>,
-        board: Entity,
+        board: &mut ChessBoard,
+        board_transform: &Transform,
         team: Team,
         position: Coord,
         kind: ChessPieceType,
-    ) {
+    ) -> Entity {
         let asset_id = kind.to_string();
 
         // Load the asset handle
@@ -107,13 +108,24 @@ impl ChessPiece {
         let scene = gltf.default_scene.clone().unwrap();
 
         // Locate the transform
-        let translation = Vec3::new(0.0, 0.0, 0.0);
-        let transform = Transform::from_xyz(translation.x, translation.y, translation.z);
+        let transform = board.get_cell_transform(&position, &board_transform, &team);
 
         // Spawn in world
-        commands.entity(board).with_children(|board| {
-            board.spawn((ChessPiece(kind), team, transform, SceneRoot(scene)));
-        });
+        let entity = commands
+            .spawn((ChessPiece(kind.clone()), team, transform, SceneRoot(scene)))
+            .id();
+
+        // Update the board grid to occupy the specified position.
+        let cell = board.get_cell_mut(&position);
+        assert!(
+            !cell.is_occupied(),
+            "Cell {} is occupied. Cannot spawn {}",
+            position,
+            kind
+        );
+        cell.occupant = Some(entity);
+
+        entity
     }
 }
 
@@ -127,7 +139,7 @@ struct GridCell {
 }
 
 impl GridCell {
-    pub fn is_occupied(self) -> bool {
+    pub fn is_occupied(&self) -> bool {
         self.occupant.is_some()
     }
 }
@@ -136,12 +148,6 @@ impl GridCell {
 pub struct ChessBoard {
     grid: Vec<Vec<GridCell>>,
 }
-
-#[derive(Component)]
-pub struct ChessBoardGrid(Vec<Vec<GridCell>>);
-
-#[derive(Resource)]
-pub struct ChessBoardMesh(Handle<Scene>);
 
 impl ChessBoard {
     /// Begin loading the chess board resources.
@@ -156,7 +162,8 @@ impl ChessBoard {
         asset_library: &Res<AssetLibrary>,
         gltf_assets: &Res<Assets<Gltf>>,
         gltf_node_assets: &Res<Assets<GltfNode>>,
-    ) -> Entity {
+        with_pieces: bool,
+    ) {
         let asset_id = "BOARD".to_string();
         // Locate the board resource
         let handle = asset_library
@@ -175,18 +182,96 @@ impl ChessBoard {
             grid[x][y].translation = node.transform.translation;
         }
 
-        commands
+        let mut board = ChessBoard { grid };
+        let board_transform = Transform::from_xyz(0.0, 0.0, 0.0);
+
+        let mut pieces = Vec::new();
+        if with_pieces {
+            #[rustfmt::skip]
+            pieces.extend([
+
+                // Spawn white team
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::A2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::B2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::C2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::D2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::E2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::F2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::G2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::H2, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::A1, ChessPieceType::Rook),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::B1, ChessPieceType::Knight),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::C1, ChessPieceType::Bishop),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::D1, ChessPieceType::Queen),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::E1, ChessPieceType::King),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::F1, ChessPieceType::Bishop),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::G1, ChessPieceType::Knight),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::White, Coord::H1, ChessPieceType::Rook),
+
+                // Spawn black team.
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::A7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::B7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::C7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::D7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::E7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::F7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::G7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::H7, ChessPieceType::Pawn),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::A8, ChessPieceType::Rook),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::B8, ChessPieceType::Knight),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::C8, ChessPieceType::Bishop),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::D8, ChessPieceType::Queen),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::E8, ChessPieceType::King),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::F8, ChessPieceType::Bishop),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::G8, ChessPieceType::Knight),
+                ChessPiece::spawn(commands, &asset_library, &gltf_assets, &mut board, &board_transform, Team::Black, Coord::H8, ChessPieceType::Rook),
+            ]);
+        }
+
+        let board_entity = commands
             .spawn((
-                ChessBoard { grid },
-                Transform::from_xyz(0.0, 0.0, 0.0),
+                board,
+                board_transform,
                 SceneRoot(gltf.default_scene.as_ref().unwrap().clone()),
             ))
-            .id()
+            .id();
+
+        for piece in pieces {
+            commands.entity(board_entity).add_child(piece);
+        }
     }
 
-    pub fn get_cell<'this>(&'this self, cell: Coord) -> &'this GridCell {
+    fn get_cell<'this>(&'this self, cell: &Coord) -> &'this GridCell {
         let (x, y) = cell.as_coords();
         &self.grid[x][y]
+    }
+
+    fn get_cell_mut<'this>(&'this mut self, cell: &Coord) -> &'this mut GridCell {
+        let (x, y) = cell.as_coords();
+        &mut self.grid[x][y]
+    }
+
+    pub fn get_cell_transform(
+        &self,
+        cell: &Coord,
+        board_transform: &Transform,
+        team: &Team,
+    ) -> Transform {
+        let cell = self.get_cell(cell);
+
+        let forward = board_transform.rotation
+            * (match team {
+                Team::Black => Vec3::NEG_Z,
+                Team::White => Vec3::Z,
+            })
+            .normalize();
+
+        let rotation = Quat::from_rotation_arc(Vec3::Z, forward);
+
+        Transform::from_translation(
+            board_transform.translation + (cell.translation * board_transform.scale),
+        )
+        .with_rotation(rotation)
     }
 }
 
@@ -244,55 +329,14 @@ impl Chess {
             return;
         }
 
-        // Spawn entities in the world.
-        let board = ChessBoard::spawn(
+        // Spawn board and all pieces
+        ChessBoard::spawn(
             &mut commands,
             &asset_library,
             &gltf_assets,
             &gltf_node_assets,
+            true,
         );
-
-        // Spawn white team
-        #[rustfmt::skip]
-        let _ = {
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::A2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::B2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::C2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::D2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::E2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::F2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::G2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::H2, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::A1, ChessPieceType::Rook);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::B1, ChessPieceType::Knight);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::C1, ChessPieceType::Bishop);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::D1, ChessPieceType::Queen);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::E1, ChessPieceType::King);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::F1, ChessPieceType::Bishop);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::G1, ChessPieceType::Knight);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::White, Coord::H1, ChessPieceType::Rook);
-        };
-
-        // Spawn black team.
-        #[rustfmt::skip]
-        let _ = {
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::A7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::B7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::C7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::D7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::E7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::F7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::G7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::H7, ChessPieceType::Pawn);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::A8, ChessPieceType::Rook);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::B8, ChessPieceType::Knight);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::C8, ChessPieceType::Bishop);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::D8, ChessPieceType::Queen);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::E8, ChessPieceType::King);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::F8, ChessPieceType::Bishop);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::G8, ChessPieceType::Knight);
-            ChessPiece::spawn(&mut commands, &asset_library, &gltf_assets, board, Team::Black, Coord::H8, ChessPieceType::Rook);
-        };
 
         // Trigger the next state.
         next_state.set(AppState::Game)

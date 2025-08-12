@@ -5,7 +5,12 @@ use std::path::PathBuf;
 /// Convert the given path to a relative repo path.
 #[cfg(feature = "cargo")]
 pub fn asset_path(path: &str) -> PathBuf {
-    PathBuf::from(path)
+    // TODO: Figure out a better strategy for locating assets.
+    if let Some(stripped) = path.strip_prefix("assets/") {
+        PathBuf::from(stripped)
+    } else {
+        PathBuf::from(path)
+    }
 }
 
 #[cfg(not(feature = "cargo"))]

@@ -1,8 +1,11 @@
 #[derive(
+    Debug,
     strum_macros::EnumIter,
     strum_macros::EnumString,
     strum_macros::Display,
     strum_macros::IntoStaticStr,
+    Clone,
+    Copy
 )]
 pub enum BoardCoordinate {
     A1,

@@ -20,7 +20,7 @@ pub enum AppState {
 }
 
 fn on_startup(mut next_state: ResMut<NextState<AppState>>) {
-    next_state.set(AppState::MenuLoading);
+    next_state.set(AppState::GameLoading);
 }
 
 fn on_shutdown(mut exit: EventWriter<AppExit>) {

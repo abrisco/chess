@@ -2,6 +2,7 @@ use bevy::gltf::GltfNode;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
+use bevy::scene::SceneInstance;
 use strum::IntoEnumIterator;
 
 use crate::assets::{asset_path, AssetLibrary};
@@ -11,6 +12,7 @@ mod board_coords;
 use board_coords::BoardCoordinate as Coord;
 
 #[derive(
+    Debug,
     strum_macros::EnumIter,
     strum_macros::EnumString,
     strum_macros::Display,
@@ -30,10 +32,19 @@ pub enum ChessPieceType {
     King,
 }
 
-#[derive(Component, Clone, Copy, strum_macros::Display, strum_macros::EnumIter, Eq, PartialEq)]
+#[derive(Debug, Component, Clone, Copy, strum_macros::EnumIter, Eq, PartialEq)]
 pub enum Team {
     Black,
     White,
+}
+
+impl std::fmt::Display for Team {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Team::Black => write!(f, "Team::Black"),
+            Team::White => write!(f, "Team::White"),
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -58,6 +69,9 @@ pub struct PieceMoveEvent {
 }
 
 #[derive(Component)]
+struct PieceNeedsTeamMaterial(Team);
+
+#[derive(Debug, Component)]
 pub struct ChessPiece {
     kind: ChessPieceType,
     team: Team,
@@ -68,7 +82,11 @@ pub struct ChessPiece {
 
 impl ChessPiece {
     /// Begin loading resources for chess pieces.
-    pub fn on_enter_loading(asset_server: &Res<AssetServer>, asset_library: &mut AssetLibrary) {
+    pub fn on_enter_loading(
+        asset_server: &Res<AssetServer>,
+        asset_library: &mut AssetLibrary,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+    ) {
         for piece in ChessPieceType::iter() {
             let path = match piece {
                 ChessPieceType::Pawn => asset_path("assets/models/pawn.glb"),
@@ -79,7 +97,32 @@ impl ChessPiece {
                 ChessPieceType::King => asset_path("assets/models/king.glb"),
             };
 
-            asset_library.insert(piece.to_string(), asset_server.load(path));
+            asset_library.insert_scene(piece.to_string(), asset_server.load(path));
+        }
+
+        // asset_library.insert_material(Team::White.to_string(), materials.add(Color::WHITE));
+        // asset_library.insert_material(Team::Black.to_string(), materials.add(Color::BLACK));
+    }
+
+    /// Adds the correct color to pieces after they've spawned.
+    fn on_spawn_scene(
+        mut commands: Commands,
+        query: Query<(Entity, &SceneInstance, &PieceNeedsTeamMaterial), Added<SceneInstance>>,
+        asset_library: Res<AssetLibrary>,
+        scene_spawner: ResMut<SceneSpawner>,
+    ) {
+        for (root, instance, PieceNeedsTeamMaterial(team)) in &query {
+            let mat = asset_library
+                .get_material(&team.to_string())
+                .unwrap_or_else(|| panic!("Unexpected material requested: {}", team));
+
+            // Iterate over entities spawned from the scene
+            for entity in scene_spawner.iter_instance_entities(**instance) {
+                commands.entity(entity).insert(MeshMaterial3d(mat.clone()));
+            }
+
+            // Cleanup: we don’t need the marker anymore
+            commands.entity(root).remove::<PieceNeedsTeamMaterial>();
         }
     }
 
@@ -97,7 +140,7 @@ impl ChessPiece {
 
         // Load the asset handle
         let handle = asset_library
-            .get(&asset_id)
+            .get_scene(&asset_id)
             .expect("Failed to locate BOARD asset.");
 
         let gltf = gltf_assets
@@ -136,31 +179,28 @@ impl ChessPiece {
         active_team: Res<ActiveTeam>,
         mut selection: ResMut<PieceSelection>,
     ) {
-        let pressed_entity = trigger.target;
-
-        // Ensure the pressed entity is actually a ChessPiece
-        let piece = match pieces_query.get(pressed_entity) {
-            Ok(p) => p,
-            Err(e) => {
-                panic!("No piece found: {:?}", e);
-            }
-        };
+        let piece_entity = trigger.target();
+        let piece = pieces_query.get(piece_entity).unwrap();
 
         match selection.piece {
             Some(selected) => {
-                if selected == pressed_entity {
+                println!("Selected({:?} New({:?})", selected, piece_entity);
+                if selected == piece_entity {
                     // Unselect the piece if it was selected twice.
                     selection.piece = None;
+                    println!("Piece unselected! {:?}", piece_entity);
                 } else {
                     // Check if another piece was selected and determine what move
                     // that could translate to.
                 }
             }
-            _ => {
+            None => {
                 // Select the piece only if it represents the active team's piece
                 if piece.team == active_team.0 {
-                    println!("Piece selected!");
-                    selection.piece = Some(pressed_entity);
+                    println!("Piece selected! {:?}", piece_entity);
+                    selection.piece = Some(piece_entity);
+                } else {
+                    println!("Not the active team: {}", active_team.0)
                 }
             }
         }
@@ -193,7 +233,7 @@ impl ChessBoard {
     pub fn on_enter_loading(asset_server: &Res<AssetServer>, asset_library: &mut AssetLibrary) {
         let handle = asset_server.load(asset_path("assets/models/chess_board.glb"));
 
-        asset_library.insert("BOARD".to_string(), handle);
+        asset_library.insert_scene("BOARD".to_string(), handle);
     }
 
     pub fn spawn(
@@ -206,7 +246,7 @@ impl ChessBoard {
         let asset_id = "BOARD".to_string();
         // Locate the board resource
         let handle = asset_library
-            .get(&asset_id)
+            .get_scene(&asset_id)
             .expect("Failed to locate BOARD asset.");
 
         let gltf = gltf_assets
@@ -398,7 +438,11 @@ const CAMERA_FOCUS: Vec3 = Vec3::ZERO;
 struct Chess;
 
 impl Chess {
-    fn on_enter_loading(mut commands: Commands, asset_server: Res<AssetServer>) {
+    fn on_enter_loading(
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        materials: ResMut<Assets<StandardMaterial>>,
+    ) {
         // Spawn Camera
         commands.spawn((
             Camera3d::default(),
@@ -425,7 +469,7 @@ impl Chess {
         ChessBoard::on_enter_loading(&asset_server, &mut asset_library);
 
         // Chess Pierces
-        ChessPiece::on_enter_loading(&asset_server, &mut asset_library);
+        ChessPiece::on_enter_loading(&asset_server, &mut asset_library, materials);
 
         // Allocate any necessary resources.
         commands.insert_resource(asset_library);
@@ -584,6 +628,18 @@ impl Chess {
     }
 }
 
+fn my_system(world: &World, children_query: Query<&ChildOf>) {
+    for my_entity in children_query.iter() {
+        let mut names = Vec::new();
+        for thing in world.inspect_entity(my_entity.0) {
+            for info in thing {
+                names.push(info.name())
+            }
+        }
+        println!("{:?} {:#?}", my_entity.0, names);
+    }
+}
+
 pub struct ChessPlugin;
 
 impl Plugin for ChessPlugin {
@@ -600,6 +656,8 @@ impl Plugin for ChessPlugin {
                 (
                     Chess::update_camera.run_if(in_state(AppState::Game)),
                     Chess::update_move.run_if(in_state(AppState::Game)),
+                    ChessPiece::on_spawn_scene,
+                    // my_system.run_if(in_state(AppState::Game)),
                 ),
             );
     }

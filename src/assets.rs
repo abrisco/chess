@@ -33,23 +33,44 @@ pub fn asset_path(path: &str) -> PathBuf {
 
 /// A resource for maintaining a collection of assets loaded into the game.
 #[derive(Resource, Default)]
-pub struct AssetLibrary(HashMap<String, Handle<Gltf>>);
+pub struct AssetLibrary {
+    pub scenes: HashMap<String, Handle<Gltf>>,
+    pub materials: HashMap<String, Handle<StandardMaterial>>,
+}
 
 impl AssetLibrary {
-    pub fn get(&self, id: &String) -> Option<&Handle<Gltf>> {
-        self.0.get(id)
+    pub fn get_scene(&self, id: &String) -> Option<&Handle<Gltf>> {
+        self.scenes.get(id)
     }
 
-    pub fn insert(&mut self, id: String, asset: Handle<Gltf>) {
-        if self.0.contains_key(&id) {
+    pub fn insert_scene(&mut self, id: String, asset: Handle<Gltf>) {
+        if self.scenes.contains_key(&id) {
             panic!("Double inserted asset: {}", id);
         }
 
-        self.0.insert(id, asset);
+        self.scenes.insert(id, asset);
+    }
+
+    pub fn get_material(&self, id: &String) -> Option<&Handle<StandardMaterial>> {
+        self.materials.get(id)
+    }
+
+    pub fn insert_material(&mut self, id: String, asset: Handle<StandardMaterial>) {
+        if self.materials.contains_key(&id) {
+            panic!("Double inserted asset: {}", id);
+        }
+
+        self.materials.insert(id, asset);
     }
 
     pub fn is_all_assets_loaded(&self, asset_server: &Res<AssetServer>) -> bool {
-        for mesh in self.0.values() {
+        for mesh in self.scenes.values() {
+            if !asset_server.is_loaded_with_dependencies(mesh) {
+                return false;
+            }
+        }
+
+        for mesh in self.materials.values() {
             if !asset_server.is_loaded_with_dependencies(mesh) {
                 return false;
             }

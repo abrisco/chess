@@ -207,7 +207,7 @@ impl ChessPiece {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 struct GridCell {
     // The entity currently occupying the cell.
     pub occupant: Option<Entity>,
@@ -222,7 +222,7 @@ impl GridCell {
     }
 }
 
-#[derive(Component)]
+#[derive(Debug, Component)]
 pub struct ChessBoard {
     grid: Vec<Vec<GridCell>>,
     occupants: HashMap<Entity, Coord>,
@@ -326,10 +326,20 @@ impl ChessBoard {
 
     fn observer_select_square(
         trigger: Trigger<Pointer<Pressed>>,
-        query: Query<&ChessBoard>,
+        board_query: Query<&ChessBoard>,
         selection: ResMut<PieceSelection>,
     ) {
-        // Determine coordinates of selection.
+        // Locate the board
+        let board_entity = trigger.target();
+        println!("{:#?}", trigger);
+        let board = board_query.get(board_entity).unwrap();
+        println!("BOARD ENTITY: {:?}", board_entity);
+
+        // println!("{:?}", gltf_node_assets.get(trigger.target()));
+
+        // gltf_node_assets.
+
+        // Identify the name of the mesh.
 
         // If selection is empty and the cell is occupied, select the occupant
         if selection.piece.is_none() {}
@@ -628,7 +638,14 @@ impl Chess {
     }
 }
 
-fn my_system(world: &World, children_query: Query<&ChildOf>) {
+fn my_system(
+    world: &World,
+    children_query: Query<&ChildOf>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+) {
+    if !keyboard_input.any_just_released([KeyCode::Space]) {
+        return;
+    }
     for my_entity in children_query.iter() {
         let mut names = Vec::new();
         for thing in world.inspect_entity(my_entity.0) {
@@ -657,7 +674,7 @@ impl Plugin for ChessPlugin {
                     Chess::update_camera.run_if(in_state(AppState::Game)),
                     Chess::update_move.run_if(in_state(AppState::Game)),
                     ChessPiece::on_spawn_scene,
-                    // my_system.run_if(in_state(AppState::Game)),
+                    my_system.run_if(in_state(AppState::Game)),
                 ),
             );
     }

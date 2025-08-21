@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bevy::gltf::GltfNode;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::platform::collections::HashMap;
@@ -56,16 +58,128 @@ impl Default for ActiveTeam {
     }
 }
 
-#[derive(Resource, Default)]
-pub struct PieceSelection {
-    pub piece: Option<Entity>,
-}
-
 #[derive(Debug, Event)]
 pub struct PieceMoveEvent {
     pub board: Entity,
     pub from: Coord,
     pub to: Coord,
+}
+
+#[derive(Resource, Default)]
+pub struct PieceSelection {
+    pub piece: Option<Entity>,
+}
+
+impl PieceSelection {
+    pub fn observer_select_piece(
+        mut trigger: Trigger<Pointer<Pressed>>,
+        pieces_query: Query<(&mut ChessPiece, &ChildOf)>,
+        board_query: Query<&ChessBoard>,
+        active_team: Res<ActiveTeam>,
+        mut selection: ResMut<PieceSelection>,
+        mut writer: EventWriter<PieceMoveEvent>,
+    ) {
+        trigger.propagate(false);
+        let piece_entity = trigger.target();
+        let (piece, piece_relationship) = pieces_query.get(piece_entity).unwrap();
+
+        match selection.piece {
+            Some(selected) => {
+                println!("Selected({:?} New({:?})", selected, piece_entity);
+                if selected == piece_entity {
+                    // Unselect the piece if it was selected twice.
+                    selection.piece = None;
+                    println!("Piece unselected! {:?}", piece_entity);
+                } else {
+                    let board_entity = piece_relationship.parent();
+                    let board = board_query.get(board_entity).unwrap();
+                    let piece_pos = board.occupants[&piece_entity];
+                    let selected_pos = board.occupants[&selected];
+
+                    // Unselect if the same square was chosen
+                    if piece_pos == selected_pos {
+                        selection.piece = None;
+                        println!("Piece unselected! {:?}", piece_entity);
+                    } else {
+                        // Check if another piece was selected and determine what move
+                        // that could translate to.
+                        let movement = PieceMoveEvent {
+                            board: board_entity,
+                            from: selected_pos,
+                            to: piece_pos,
+                        };
+                        println!("Submitting movement: {:?}", movement);
+                        writer.write(movement);
+                    }
+                }
+            }
+            None => {
+                // Select the piece only if it represents the active team's piece
+                if piece.team == active_team.0 {
+                    println!("Piece selected! {:?}", piece_entity);
+                    selection.piece = Some(piece_entity);
+                } else {
+                    println!("Not the active team: {}", active_team.0)
+                }
+            }
+        }
+    }
+
+    fn observer_select_square(
+        mut trigger: Trigger<Pointer<Pressed>>,
+        board_query: Query<(&ChessBoard, &Transform)>,
+        piece_query: Query<&ChessPiece>,
+        active_team: Res<ActiveTeam>,
+        mut selection: ResMut<PieceSelection>,
+        mut writer: EventWriter<PieceMoveEvent>,
+    ) {
+        trigger.propagate(false);
+
+        // Locate the board
+        let board_entity = trigger.target();
+        let (board, board_transform) = board_query.get(board_entity).unwrap();
+
+        // In world space (for some reason).
+        let trigger_pos = trigger.event().hit.position.unwrap();
+
+        // Find the closest point to the target
+        let coord = {
+            let mut distances = Coord::iter()
+                .map(|coord| {
+                    let cell_pos = board.get_cell_translation(&coord, &board_transform);
+                    (trigger_pos.distance(cell_pos), coord)
+                })
+                .collect::<Vec<(_, _)>>();
+
+            distances.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            distances.first().unwrap().1
+        };
+
+        match selection.piece {
+            // Submit the move request
+            Some(piece) => {
+                let movement = PieceMoveEvent {
+                    board: board_entity,
+                    from: board.occupants[&piece],
+                    to: coord,
+                };
+                println!("Submitting movement: {:?}", movement);
+                writer.write(movement);
+            }
+            // If selection is empty and the cell is occupied, select the occupant
+            None => {
+                if let Some(occupant) = board.get_cell(&coord).occupant {
+                    let piece = piece_query.get(occupant).unwrap();
+                    if piece.team == active_team.0 {
+                        selection.piece = Some(occupant);
+                        println!("Selected occupant at {}", coord);
+                    } else {
+                        println!("Not active team at {}", coord)
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Component)]
@@ -165,45 +279,12 @@ impl ChessPiece {
                 transform,
                 SceneRoot(scene),
             ))
-            .observe(Self::observer_select_piece)
+            .observe(PieceSelection::observer_select_piece)
             .id();
 
         board.insert_piece(entity, position);
 
         entity
-    }
-
-    fn observer_select_piece(
-        trigger: Trigger<Pointer<Pressed>>,
-        pieces_query: Query<&mut ChessPiece>,
-        active_team: Res<ActiveTeam>,
-        mut selection: ResMut<PieceSelection>,
-    ) {
-        let piece_entity = trigger.target();
-        let piece = pieces_query.get(piece_entity).unwrap();
-
-        match selection.piece {
-            Some(selected) => {
-                println!("Selected({:?} New({:?})", selected, piece_entity);
-                if selected == piece_entity {
-                    // Unselect the piece if it was selected twice.
-                    selection.piece = None;
-                    println!("Piece unselected! {:?}", piece_entity);
-                } else {
-                    // Check if another piece was selected and determine what move
-                    // that could translate to.
-                }
-            }
-            None => {
-                // Select the piece only if it represents the active team's piece
-                if piece.team == active_team.0 {
-                    println!("Piece selected! {:?}", piece_entity);
-                    selection.piece = Some(piece_entity);
-                } else {
-                    println!("Not the active team: {}", active_team.0)
-                }
-            }
-        }
     }
 }
 
@@ -316,35 +397,12 @@ impl ChessBoard {
                 board_transform,
                 SceneRoot(gltf.default_scene.as_ref().unwrap().clone()),
             ))
-            .observe(Self::observer_select_square)
+            .observe(PieceSelection::observer_select_square)
             .id();
 
         for piece in pieces {
             commands.entity(board_entity).add_child(piece);
         }
-    }
-
-    fn observer_select_square(
-        trigger: Trigger<Pointer<Pressed>>,
-        board_query: Query<&ChessBoard>,
-        selection: ResMut<PieceSelection>,
-    ) {
-        // Locate the board
-        let board_entity = trigger.target();
-        println!("{:#?}", trigger);
-        let board = board_query.get(board_entity).unwrap();
-        println!("BOARD ENTITY: {:?}", board_entity);
-
-        // println!("{:?}", gltf_node_assets.get(trigger.target()));
-
-        // gltf_node_assets.
-
-        // Identify the name of the mesh.
-
-        // If selection is empty and the cell is occupied, select the occupant
-        if selection.piece.is_none() {}
-
-        // Check
     }
 
     fn get_cell<'this>(&'this self, cell: &Coord) -> &'this GridCell {
@@ -361,14 +419,18 @@ impl ChessBoard {
         unimplemented!()
     }
 
+    pub fn get_cell_translation(&self, cell: &Coord, board_transform: &Transform) -> Vec3 {
+        let cell = self.get_cell(cell);
+
+        board_transform.translation + (cell.translation * board_transform.scale)
+    }
+
     pub fn get_cell_transform(
         &self,
         cell: &Coord,
         board_transform: &Transform,
         team: &Team,
     ) -> Transform {
-        let cell = self.get_cell(cell);
-
         let forward = board_transform.rotation
             * (match team {
                 Team::Black => Vec3::NEG_Z,
@@ -378,10 +440,8 @@ impl ChessBoard {
 
         let rotation = Quat::from_rotation_arc(Vec3::Z, forward);
 
-        Transform::from_translation(
-            board_transform.translation + (cell.translation * board_transform.scale),
-        )
-        .with_rotation(rotation)
+        Transform::from_translation(self.get_cell_translation(cell, board_transform))
+            .with_rotation(rotation)
     }
 
     pub fn insert_piece(&mut self, piece: Entity, position: Coord) {
@@ -395,7 +455,7 @@ impl ChessBoard {
 
     pub fn move_piece(
         &mut self,
-        piece: Entity,
+        piece_to_move: Entity,
         piece_transform: &mut Transform,
         team: &Team,
         to: Coord,
@@ -403,18 +463,18 @@ impl ChessBoard {
     ) {
         let from_position = self
             .occupants
-            .insert(piece, to)
+            .insert(piece_to_move, to)
             .unwrap_or_else(|| panic!("Entity is not an occupant of the board."));
 
         // Update the destination
         {
             let to_cell = self.get_cell_mut(&to);
             assert!(
-                to_cell.occupant.is_some(),
+                to_cell.occupant.is_none(),
                 "Cell {} has an occupant that needs to be cleared first.",
                 &to
             );
-            to_cell.occupant = Some(piece);
+            to_cell.occupant = Some(piece_to_move);
         }
 
         // Clear the previous cell
@@ -590,6 +650,7 @@ impl Chess {
         mut active_team: ResMut<ActiveTeam>,
     ) {
         for event in move_events.read() {
+            println!("Handling move: {:?}", event);
             let (mut board, board_transform) = match boards_query.get_mut(event.board) {
                 Ok(b) => b,
                 Err(e) => panic!("Unable to find chess board: {:?}", e),

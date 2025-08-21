@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use bevy::gltf::GltfNode;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::platform::collections::HashMap;
@@ -110,6 +108,7 @@ impl PieceSelection {
                         };
                         println!("Submitting movement: {:?}", movement);
                         writer.write(movement);
+                        selection.piece = None;
                     }
                 }
             }
@@ -165,6 +164,7 @@ impl PieceSelection {
                 };
                 println!("Submitting movement: {:?}", movement);
                 writer.write(movement);
+                selection.piece = None;
             }
             // If selection is empty and the cell is occupied, select the occupant
             None => {
@@ -214,8 +214,8 @@ impl ChessPiece {
             asset_library.insert_scene(piece.to_string(), asset_server.load(path));
         }
 
-        // asset_library.insert_material(Team::White.to_string(), materials.add(Color::WHITE));
-        // asset_library.insert_material(Team::Black.to_string(), materials.add(Color::BLACK));
+        asset_library.insert_material(Team::White.to_string(), materials.add(Color::WHITE));
+        asset_library.insert_material(Team::Black.to_string(), materials.add(Color::BLACK));
     }
 
     /// Adds the correct color to pieces after they've spawned.
@@ -295,12 +295,6 @@ struct GridCell {
 
     // The translation in local space to the root of the cell on the board.
     translation: Vec3,
-}
-
-impl GridCell {
-    pub fn get_translation(&self) -> Vec3 {
-        self.translation
-    }
 }
 
 #[derive(Debug, Component)]
@@ -413,10 +407,6 @@ impl ChessBoard {
     fn get_cell_mut<'this>(&'this mut self, cell: &Coord) -> &'this mut GridCell {
         let (x, y) = cell.as_coords();
         &mut self.grid[x][y]
-    }
-
-    fn get_selected_cell_mut<'this>(&'this mut self) -> &'this mut GridCell {
-        unimplemented!()
     }
 
     pub fn get_cell_translation(&self, cell: &Coord, board_transform: &Transform) -> Vec3 {
@@ -698,26 +688,6 @@ impl Chess {
         }
     }
 }
-
-fn my_system(
-    world: &World,
-    children_query: Query<&ChildOf>,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-) {
-    if !keyboard_input.any_just_released([KeyCode::Space]) {
-        return;
-    }
-    for my_entity in children_query.iter() {
-        let mut names = Vec::new();
-        for thing in world.inspect_entity(my_entity.0) {
-            for info in thing {
-                names.push(info.name())
-            }
-        }
-        println!("{:?} {:#?}", my_entity.0, names);
-    }
-}
-
 pub struct ChessPlugin;
 
 impl Plugin for ChessPlugin {
@@ -735,7 +705,6 @@ impl Plugin for ChessPlugin {
                     Chess::update_camera.run_if(in_state(AppState::Game)),
                     Chess::update_move.run_if(in_state(AppState::Game)),
                     ChessPiece::on_spawn_scene,
-                    my_system.run_if(in_state(AppState::Game)),
                 ),
             );
     }

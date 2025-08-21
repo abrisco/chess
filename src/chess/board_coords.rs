@@ -6,7 +6,8 @@
     strum_macros::IntoStaticStr,
     Clone,
     Copy,
-    PartialEq, Eq
+    PartialEq,
+    Eq,
 )]
 pub enum BoardCoordinate {
     A1,

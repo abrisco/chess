@@ -214,8 +214,8 @@ impl ChessPiece {
             asset_library.insert_scene(piece.to_string(), asset_server.load(path));
         }
 
-        asset_library.insert_material(Team::White.to_string(), materials.add(Color::WHITE));
-        asset_library.insert_material(Team::Black.to_string(), materials.add(Color::BLACK));
+        // asset_library.insert_material(Team::White.to_string(), materials.add(Color::WHITE));
+        // asset_library.insert_material(Team::Black.to_string(), materials.add(Color::BLACK));
     }
 
     /// Adds the correct color to pieces after they've spawned.

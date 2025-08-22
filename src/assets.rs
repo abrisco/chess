@@ -5,17 +5,6 @@ use std::path::PathBuf;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
-/// Convert the given path to a relative repo path.
-#[cfg(feature = "cargo")]
-pub fn asset_path(path: &str) -> PathBuf {
-    // TODO: Figure out a better strategy for locating assets.
-    if let Some(stripped) = path.strip_prefix("assets/") {
-        PathBuf::from(stripped)
-    } else {
-        PathBuf::from(path)
-    }
-}
-
 #[cfg(not(feature = "cargo"))]
 lazy_static::lazy_static! {
     static ref RUNFILES: runfiles::Runfiles = {
@@ -23,12 +12,59 @@ lazy_static::lazy_static! {
     };
 }
 
+#[cfg(feature = "cargo")]
+fn loader_path() -> PathBuf {
+    PathBuf::from("./")
+}
+
+#[cfg(not(feature = "cargo"))]
+fn loader_path() -> PathBuf {
+    let path = runfiles::find_runfiles_dir().expect("A runfiles directory is required.");
+
+    // When running via `bazel run`, try to locate the execroot.
+    let manifest = path.join("MANIFEST");
+    if std::env::var_os("BUILD_WORKSPACE_DIRECTORY").is_some() && manifest.exists() {
+        let mut current = path.clone();
+        loop {
+            if let Some(file_name) = current.file_name() {
+                if file_name == "execroot" && current.is_dir() {
+                    return current;
+                }
+            }
+
+            // move to parent
+            if !current.pop() {
+                break;
+            }
+        }
+    }
+
+    path
+}
+
+lazy_static::lazy_static! {
+    pub static ref LOADER_PATH: PathBuf = {
+        loader_path()
+    };
+}
+
+/// Convert the given path to a relative repo path.
+#[cfg(feature = "cargo")]
+pub fn asset_path(path: &str) -> PathBuf {
+    PathBuf::from(path)
+}
+
 /// Return the runfiles path for a given asset.
 #[cfg(not(feature = "cargo"))]
 pub fn asset_path(path: &str) -> PathBuf {
     let runfile_path = format!("_main/{}", path);
-    runfiles::rlocation!(RUNFILES, runfile_path)
-        .unwrap_or_else(|e| panic!("Failed to locate runfile: {}\n{:?}", path, e))
+    let path = runfiles::rlocation!(RUNFILES, runfile_path)
+        .unwrap_or_else(|| panic!("Failed to locate runfile: {}", path));
+
+    // Attempt to make paths relative.
+    path.strip_prefix(LOADER_PATH.as_path())
+        .expect("Assets should always be relative to the loader path.")
+        .to_path_buf()
 }
 
 /// A resource for maintaining a collection of assets loaded into the game.

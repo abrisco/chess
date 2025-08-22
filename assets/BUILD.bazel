@@ -1,5 +1,20 @@
+load("//tools/blender:blender.bzl", "blender_gltf_export")
+
+BLEND_FILES = glob(["models/*.blend"])
+
 filegroup(
     name = "assets",
-    srcs = glob(["**/*.glb"]),
+    srcs = [
+        src.replace(".blend", ".glb")
+        for src in BLEND_FILES
+    ],
     visibility = ["//:__subpackages__"],
 )
+
+[
+    blender_gltf_export(
+        name = src.replace(".blend", ".glb"),
+        blend_file = src,
+    )
+    for src in BLEND_FILES
+]

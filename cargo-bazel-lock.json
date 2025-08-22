@@ -1,5 +1,5 @@
 {
-  "checksum": "9c0940665a2a72bed0da54c2fa3bd09da8a32fd553ca751066c98aa5d2b80be6",
+  "checksum": "42143ba9b5b05d8c3c00df44846f2e95cbe3d179c05b89055d6def341358ee25",
   "crates": {
     "accesskit 0.18.0": {
       "name": "accesskit",
@@ -22834,6 +22834,51 @@
       ],
       "license_file": "LICENSE"
     },
+    "strum 0.27.2": {
+      "name": "strum",
+      "version": "0.27.2",
+      "package_url": "https://github.com/Peternator7/strum",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/strum/0.27.2/download",
+          "sha256": "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "strum",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "strum",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "default",
+            "std"
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.27.2"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
     "strum_macros 0.26.4": {
       "name": "strum_macros",
       "version": "0.26.4",
@@ -22895,6 +22940,65 @@
           "selects": {}
         },
         "version": "0.26.4"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
+    "strum_macros 0.27.2": {
+      "name": "strum_macros",
+      "version": "0.27.2",
+      "package_url": "https://github.com/Peternator7/strum",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/strum_macros/0.27.2/download",
+          "sha256": "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "strum_macros",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "strum_macros",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "heck 0.5.0",
+              "target": "heck"
+            },
+            {
+              "id": "proc-macro2 1.0.95",
+              "target": "proc_macro2"
+            },
+            {
+              "id": "quote 1.0.40",
+              "target": "quote"
+            },
+            {
+              "id": "syn 2.0.104",
+              "target": "syn"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.27.2"
       },
       "license": "MIT",
       "license_ids": [
@@ -23222,16 +23326,40 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "cargo",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
               "id": "bevy 0.16.1",
               "target": "bevy"
+            },
+            {
+              "id": "lazy_static 1.5.0",
+              "target": "lazy_static"
+            },
+            {
+              "id": "strum 0.27.2",
+              "target": "strum"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "strum_macros 0.27.2",
+              "target": "strum_macros"
+            }
+          ],
+          "selects": {}
+        },
         "version": "0.1.0"
       },
       "license": null,
@@ -32373,7 +32501,10 @@
     "x86_64-uwp-windows-msvc": []
   },
   "direct_deps": [
-    "bevy 0.16.1"
+    "bevy 0.16.1",
+    "lazy_static 1.5.0",
+    "strum 0.27.2",
+    "strum_macros 0.27.2"
   ],
   "direct_dev_deps": [],
   "unused_patches": []

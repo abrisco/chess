@@ -11,6 +11,6 @@ default = ["cargo"]
 
 [dependencies]
 bevy = "0.16.1"
+lazy_static = "1.5.0"
 strum = "0.27.2"
 strum_macros = "0.27"
-lazy_static = "1.5.0"

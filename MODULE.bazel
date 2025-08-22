@@ -8,6 +8,12 @@ module(
 bazel_dep(name = "rules_rust", version = "0.63.0")
 bazel_dep(name = "rules_blender", version = "0.0.1")
 
+git_override(
+    module_name = "rules_blender",
+    remote = "https://github.com/abrisco/rules_blender.git",
+    branch = "main",
+)
+
 RUST_VERSION = "1.88.0"
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
@@ -22,6 +28,17 @@ use_repo(rust, "rust_toolchains")
 
 register_toolchains(
     "@rust_toolchains//:all",
+    "@blender_toolchains//:all",
+)
+
+blender = use_extension("@rules_blender//blender:extensions.bzl", "blender")
+blender.toolchain(
+    name = "blender_toolchains",
+)
+use_repo(blender, "blender_toolchains")
+
+register_toolchains(
+    "@blender_toolchains//:all",
 )
 
 rust_host_tools = use_extension("@rules_rust//rust:extensions.bzl", "rust_host_tools")

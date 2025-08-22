@@ -7,12 +7,15 @@ rust_binary(
     # Bevy relies on the existence of `Cargo.toml` as a potential source
     # of metadata. https://github.com/bevyengine/bevy/pull/9207
     compile_data = ["Cargo.toml"],
+    data = ["//assets"],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
     ),
     deps = all_crate_deps(
         normal = True,
-    ),
+    ) + [
+        "@rules_rust//rust/runfiles",
+    ],
 )
 
 rust_test(

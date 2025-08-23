@@ -183,7 +183,7 @@ impl PieceSelection {
 }
 
 #[derive(Component)]
-struct PieceNeedsTeamMaterial(Team);
+struct PieceNeedsTeamMaterial;
 
 #[derive(Debug, Component)]
 pub struct ChessPiece {
@@ -221,18 +221,25 @@ impl ChessPiece {
     /// Adds the correct color to pieces after they've spawned.
     fn on_spawn_scene(
         mut commands: Commands,
-        query: Query<(Entity, &SceneInstance, &PieceNeedsTeamMaterial), Added<SceneInstance>>,
+        pieces_query: Query<
+            (Entity, &SceneInstance, &Team, &PieceNeedsTeamMaterial),
+            Added<SceneInstance>,
+        >,
+        meshes_query: Query<(), With<Mesh3d>>,
         asset_library: Res<AssetLibrary>,
         scene_spawner: ResMut<SceneSpawner>,
     ) {
-        for (root, instance, PieceNeedsTeamMaterial(team)) in &query {
+        for (root, instance, team, _) in &pieces_query {
             let mat = asset_library
                 .get_material(&team.to_string())
                 .unwrap_or_else(|| panic!("Unexpected material requested: {}", team));
 
             // Iterate over entities spawned from the scene
             for entity in scene_spawner.iter_instance_entities(**instance) {
-                commands.entity(entity).insert(MeshMaterial3d(mat.clone()));
+                // Only add materials to entites with meshes.
+                if meshes_query.contains(entity) {
+                    commands.entity(entity).insert(MeshMaterial3d(mat.clone()));
+                }
             }
 
             // Cleanup: we don’t need the marker anymore
@@ -278,6 +285,7 @@ impl ChessPiece {
                 team,
                 transform,
                 SceneRoot(scene),
+                // PieceNeedsTeamMaterial,
             ))
             .observe(PieceSelection::observer_select_piece)
             .id();

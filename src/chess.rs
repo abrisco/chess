@@ -196,11 +196,7 @@ pub struct ChessPiece {
 
 impl ChessPiece {
     /// Begin loading resources for chess pieces.
-    pub fn on_enter_loading(
-        asset_server: &Res<AssetServer>,
-        asset_library: &mut AssetLibrary,
-        mut materials: ResMut<Assets<StandardMaterial>>,
-    ) {
+    pub fn on_enter_loading(asset_server: &Res<AssetServer>, asset_library: &mut AssetLibrary) {
         for piece in ChessPieceType::iter() {
             let path = match piece {
                 ChessPieceType::Pawn => asset_path("assets/models/pawn.glb"),
@@ -213,9 +209,6 @@ impl ChessPiece {
 
             asset_library.insert_scene(piece.to_string(), asset_server.load(path));
         }
-
-        // asset_library.insert_material(Team::White.to_string(), materials.add(Color::WHITE));
-        // asset_library.insert_material(Team::Black.to_string(), materials.add(Color::BLACK));
     }
 
     /// Adds the correct color to pieces after they've spawned.
@@ -226,13 +219,14 @@ impl ChessPiece {
             Added<SceneInstance>,
         >,
         meshes_query: Query<(), With<Mesh3d>>,
-        asset_library: Res<AssetLibrary>,
         scene_spawner: ResMut<SceneSpawner>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
         for (root, instance, team, _) in &pieces_query {
-            let mat = asset_library
-                .get_material(&team.to_string())
-                .unwrap_or_else(|| panic!("Unexpected material requested: {}", team));
+            let mat = materials.add(match team {
+                Team::Black => Color::BLACK,
+                Team::White => Color::WHITE,
+            });
 
             // Iterate over entities spawned from the scene
             for entity in scene_spawner.iter_instance_entities(**instance) {
@@ -285,7 +279,7 @@ impl ChessPiece {
                 team,
                 transform,
                 SceneRoot(scene),
-                // PieceNeedsTeamMaterial,
+                PieceNeedsTeamMaterial,
             ))
             .observe(PieceSelection::observer_select_piece)
             .id();
@@ -506,11 +500,7 @@ const CAMERA_FOCUS: Vec3 = Vec3::ZERO;
 struct Chess;
 
 impl Chess {
-    fn on_enter_loading(
-        mut commands: Commands,
-        asset_server: Res<AssetServer>,
-        materials: ResMut<Assets<StandardMaterial>>,
-    ) {
+    fn on_enter_loading(mut commands: Commands, asset_server: Res<AssetServer>) {
         // Spawn Camera
         commands.spawn((
             Camera3d::default(),
@@ -537,7 +527,7 @@ impl Chess {
         ChessBoard::on_enter_loading(&asset_server, &mut asset_library);
 
         // Chess Pierces
-        ChessPiece::on_enter_loading(&asset_server, &mut asset_library, materials);
+        ChessPiece::on_enter_loading(&asset_server, &mut asset_library);
 
         // Allocate any necessary resources.
         commands.insert_resource(asset_library);

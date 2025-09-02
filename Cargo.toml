@@ -1,9 +1,10 @@
 [package]
-name = "tactics"
+name = "chess"
 version = "0.1.0"
 edition = "2021"
 
 [features]
+# A feature for identifying Cargo vs Bazel build systems.
 cargo = []
 default = ["cargo"]
 

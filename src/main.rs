@@ -30,11 +30,21 @@ fn on_shutdown(mut exit: EventWriter<AppExit>) {
 fn main() {
     let loader_path = assets::LOADER_PATH.to_string_lossy().to_string();
     App::new()
-        .add_plugins(DefaultPlugins.set(AssetPlugin {
-            file_path: loader_path.clone(),
-            processed_file_path: loader_path,
-            ..Default::default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    file_path: loader_path.clone(),
+                    processed_file_path: loader_path,
+                    ..Default::default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Chess".into(),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .init_state::<AppState>()
         .add_systems(Startup, on_startup)
         .add_systems(OnEnter(AppState::Shutdown), on_shutdown)

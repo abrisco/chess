@@ -1517,6 +1517,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "chess"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "lazy_static",
+ "strum 0.27.2",
+ "strum_macros 0.27.2",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3899,16 +3909,6 @@ dependencies = [
  "ntapi",
  "objc2-core-foundation",
  "windows 0.57.0",
-]
-
-[[package]]
-name = "tactics"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "lazy_static",
- "strum 0.27.2",
- "strum_macros 0.27.2",
 ]
 
 [[package]]

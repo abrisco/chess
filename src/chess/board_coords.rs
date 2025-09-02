@@ -1,3 +1,32 @@
+//! Chess board coordinates
+
+#[derive(Debug, strum_macros::EnumIter)]
+pub enum Direction {
+    Up,
+    UpRight,
+    Right,
+    DownRight,
+    Down,
+    DownLeft,
+    Left,
+    UpLeft,
+}
+
+impl Direction {
+    pub fn as_coords(&self) -> (i32, i32) {
+        match self {
+            Direction::Up => (0, 1),
+            Direction::UpRight => (1, 1),
+            Direction::Right => (1, 0),
+            Direction::DownRight => (1, -1),
+            Direction::Down => (0, -1),
+            Direction::DownLeft => (-1, -1),
+            Direction::Left => (-1, 0),
+            Direction::UpLeft => (-1, 1),
+        }
+    }
+}
+
 #[derive(
     Debug,
     strum_macros::EnumIter,
@@ -8,6 +37,7 @@
     Copy,
     PartialEq,
     Eq,
+    Hash,
 )]
 pub enum BoardCoordinate {
     A1,
@@ -150,6 +180,91 @@ impl BoardCoordinate {
             BoardCoordinate::H6 => (7, 5),
             BoardCoordinate::H7 => (7, 6),
             BoardCoordinate::H8 => (7, 7),
+        }
+    }
+
+    pub fn try_transform(self, x: i32, y: i32) -> Result<Self, String> {
+        let (cur_x, cur_y) = self.as_coords();
+        let new_x = cur_x as i32 + x;
+        let new_y = cur_y as i32 + y;
+        if new_x < 0 || new_y < 0 {
+            return Err(format!("Negative Bounds ({}, {})", new_x, new_y));
+        }
+
+        Self::try_from((new_x as usize, new_y as usize))
+    }
+}
+
+impl TryFrom<(usize, usize)> for BoardCoordinate {
+    type Error = String;
+
+    fn try_from(value: (usize, usize)) -> Result<Self, Self::Error> {
+        match value {
+            (0, 0) => Ok(BoardCoordinate::A1),
+            (0, 1) => Ok(BoardCoordinate::A2),
+            (0, 2) => Ok(BoardCoordinate::A3),
+            (0, 3) => Ok(BoardCoordinate::A4),
+            (0, 4) => Ok(BoardCoordinate::A5),
+            (0, 5) => Ok(BoardCoordinate::A6),
+            (0, 6) => Ok(BoardCoordinate::A7),
+            (0, 7) => Ok(BoardCoordinate::A8),
+            (1, 0) => Ok(BoardCoordinate::B1),
+            (1, 1) => Ok(BoardCoordinate::B2),
+            (1, 2) => Ok(BoardCoordinate::B3),
+            (1, 3) => Ok(BoardCoordinate::B4),
+            (1, 4) => Ok(BoardCoordinate::B5),
+            (1, 5) => Ok(BoardCoordinate::B6),
+            (1, 6) => Ok(BoardCoordinate::B7),
+            (1, 7) => Ok(BoardCoordinate::B8),
+            (2, 0) => Ok(BoardCoordinate::C1),
+            (2, 1) => Ok(BoardCoordinate::C2),
+            (2, 2) => Ok(BoardCoordinate::C3),
+            (2, 3) => Ok(BoardCoordinate::C4),
+            (2, 4) => Ok(BoardCoordinate::C5),
+            (2, 5) => Ok(BoardCoordinate::C6),
+            (2, 6) => Ok(BoardCoordinate::C7),
+            (2, 7) => Ok(BoardCoordinate::C8),
+            (3, 0) => Ok(BoardCoordinate::D1),
+            (3, 1) => Ok(BoardCoordinate::D2),
+            (3, 2) => Ok(BoardCoordinate::D3),
+            (3, 3) => Ok(BoardCoordinate::D4),
+            (3, 4) => Ok(BoardCoordinate::D5),
+            (3, 5) => Ok(BoardCoordinate::D6),
+            (3, 6) => Ok(BoardCoordinate::D7),
+            (3, 7) => Ok(BoardCoordinate::D8),
+            (4, 0) => Ok(BoardCoordinate::E1),
+            (4, 1) => Ok(BoardCoordinate::E2),
+            (4, 2) => Ok(BoardCoordinate::E3),
+            (4, 3) => Ok(BoardCoordinate::E4),
+            (4, 4) => Ok(BoardCoordinate::E5),
+            (4, 5) => Ok(BoardCoordinate::E6),
+            (4, 6) => Ok(BoardCoordinate::E7),
+            (4, 7) => Ok(BoardCoordinate::E8),
+            (5, 0) => Ok(BoardCoordinate::F1),
+            (5, 1) => Ok(BoardCoordinate::F2),
+            (5, 2) => Ok(BoardCoordinate::F3),
+            (5, 3) => Ok(BoardCoordinate::F4),
+            (5, 4) => Ok(BoardCoordinate::F5),
+            (5, 5) => Ok(BoardCoordinate::F6),
+            (5, 6) => Ok(BoardCoordinate::F7),
+            (5, 7) => Ok(BoardCoordinate::F8),
+            (6, 0) => Ok(BoardCoordinate::G1),
+            (6, 1) => Ok(BoardCoordinate::G2),
+            (6, 2) => Ok(BoardCoordinate::G3),
+            (6, 3) => Ok(BoardCoordinate::G4),
+            (6, 4) => Ok(BoardCoordinate::G5),
+            (6, 5) => Ok(BoardCoordinate::G6),
+            (6, 6) => Ok(BoardCoordinate::G7),
+            (6, 7) => Ok(BoardCoordinate::G8),
+            (7, 0) => Ok(BoardCoordinate::H1),
+            (7, 1) => Ok(BoardCoordinate::H2),
+            (7, 2) => Ok(BoardCoordinate::H3),
+            (7, 3) => Ok(BoardCoordinate::H4),
+            (7, 4) => Ok(BoardCoordinate::H5),
+            (7, 5) => Ok(BoardCoordinate::H6),
+            (7, 6) => Ok(BoardCoordinate::H7),
+            (7, 7) => Ok(BoardCoordinate::H8),
+            _ => Err(format!("Out Of Bounds: ({}, {})", value.0, value.1)),
         }
     }
 }

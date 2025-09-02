@@ -1,3 +1,7 @@
+//! Chess Implementation
+
+use std::collections::HashSet;
+
 use bevy::gltf::GltfNode;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::platform::collections::HashMap;
@@ -10,6 +14,7 @@ use crate::AppState;
 
 mod board_coords;
 use board_coords::BoardCoordinate as Coord;
+use board_coords::Direction as BoardDir;
 
 #[derive(
     Debug,
@@ -436,6 +441,10 @@ impl ChessBoard {
             .with_rotation(rotation)
     }
 
+    pub fn is_cell_occupied(&self, cell: &Coord) -> bool {
+        self.get_cell(cell).occupant.is_some()
+    }
+
     pub fn insert_piece(&mut self, piece: Entity, position: Coord) {
         // Update the board grid to occupy the specified position.
         let cell = self.get_cell_mut(&position);
@@ -518,7 +527,7 @@ impl Chess {
                 shadows_enabled: true,
                 ..default()
             },
-            Transform::from_xyz(4.0, 8.0, 9.0),
+            Transform::from_xyz(2.0, 4.0, 4.5),
         ));
 
         let mut asset_library = AssetLibrary::default();
@@ -644,6 +653,20 @@ impl Chess {
                 Err(e) => panic!("Unable to find chess board: {:?}", e),
             };
 
+            // Check if movement is legal
+            let moves = Chess::compute_moves(
+                &board,
+                pieces_query.transmute_lens::<&ChessPiece>().query(),
+                event.from,
+            );
+            if !moves.contains(&event.to) {
+                println!(
+                    "Move is illegal! `{} -> {}`. Possible moves `{:?}`",
+                    event.from, event.to, moves
+                );
+                continue;
+            }
+
             let from_cell = board.get_cell_mut(&event.from);
             let from_occupant = match from_cell.occupant {
                 Some(o) => o,
@@ -684,6 +707,209 @@ impl Chess {
                 Team::White => Team::Black,
             };
         }
+    }
+
+    fn compute_moves(
+        board: &ChessBoard,
+        pieces: Query<&ChessPiece>,
+        from: Coord,
+    ) -> HashSet<Coord> {
+        let from_cell = board.get_cell(&from);
+        let piece_entity = from_cell
+            .occupant
+            .expect("Cannot compute moves from a cell with no pieces");
+        let piece = pieces
+            .get(piece_entity)
+            .unwrap_or_else(|e| panic!("Piece {} was not in query\n{:?}", from, e));
+
+        let mut moves = HashSet::new();
+
+        let forward = match piece.team {
+            Team::Black => -1,
+            Team::White => 1,
+        };
+
+        match piece.kind {
+            ChessPieceType::Pawn => {
+                if let Ok(ahead) = from.try_transform(0, 1 * forward) {
+                    if !board.is_cell_occupied(&ahead) {
+                        moves.insert(ahead);
+
+                        if !piece.has_moved {
+                            let ahead = ahead.try_transform( 0, 1 * forward).expect("Pawns should always spawn with at least two sqpaces ahead of them.");
+                            if !board.is_cell_occupied(&ahead) {
+                                moves.insert(ahead);
+                            }
+                        }
+                    }
+                }
+            }
+            ChessPieceType::Rook => {
+                for movable_dir in [
+                    BoardDir::Up,
+                    BoardDir::Down,
+                    BoardDir::Left,
+                    BoardDir::Right,
+                ] {
+                    let mut distance = 1;
+                    let (x, y) = movable_dir.as_coords();
+                    loop {
+                        if let Ok(ahead) = from.try_transform(x * distance, y * distance) {
+                            println!("Rook checking {}", ahead);
+                            let cell = board.get_cell(&ahead);
+                            match cell.occupant {
+                                Some(entity) => {
+                                    let occupant = pieces.get(entity).unwrap_or_else(|e| {
+                                        panic!("Occupant {} is not a know piece: {:?}", entity, e)
+                                    });
+                                    if occupant.team != piece.team {
+                                        moves.insert(ahead);
+                                    }
+                                    break;
+                                }
+                                None => {
+                                    moves.insert(ahead);
+                                }
+                            }
+
+                            // Increase distance for the next check.
+                            distance += 1;
+                            continue;
+                        }
+
+                        break;
+                    }
+                }
+            }
+            ChessPieceType::Knight => {
+                for movable_dir in [
+                    BoardDir::UpLeft,
+                    BoardDir::UpRight,
+                    BoardDir::DownLeft,
+                    BoardDir::DownRight,
+                ] {
+                    let (x, y) = movable_dir.as_coords();
+                    let (x, y) = match movable_dir {
+                        BoardDir::UpRight => (x, y + 1),
+                        BoardDir::DownRight => (x, y - 1),
+                        BoardDir::DownLeft => (x, y - 1),
+                        BoardDir::UpLeft => (x, y + 1),
+                        _ => unreachable!(),
+                    };
+
+                    if let Ok(ahead) = from.try_transform(x, y) {
+                        let cell = board.get_cell(&ahead);
+                        match cell.occupant {
+                            Some(entity) => {
+                                let occupant = pieces.get(entity).unwrap_or_else(|e| {
+                                    panic!("Occupant {} is not a know piece: {:?}", entity, e)
+                                });
+                                if occupant.team != piece.team {
+                                    moves.insert(ahead);
+                                    continue;
+                                }
+                            }
+                            None => {
+                                moves.insert(ahead);
+                            }
+                        }
+                    }
+                }
+            }
+            ChessPieceType::Bishop => {
+                for movable_dir in [
+                    BoardDir::UpLeft,
+                    BoardDir::UpRight,
+                    BoardDir::DownLeft,
+                    BoardDir::DownRight,
+                ] {
+                    let mut distance = 1;
+                    let (x, y) = movable_dir.as_coords();
+                    loop {
+                        if let Ok(ahead) = from.try_transform(x * distance, y * distance) {
+                            let cell = board.get_cell(&ahead);
+                            match cell.occupant {
+                                Some(entity) => {
+                                    let occupant = pieces.get(entity).unwrap_or_else(|e| {
+                                        panic!("Occupant {} is not a know piece: {:?}", entity, e)
+                                    });
+                                    if occupant.team != piece.team {
+                                        moves.insert(ahead);
+                                        continue;
+                                    }
+                                }
+                                None => {
+                                    moves.insert(ahead);
+                                }
+                            }
+
+                            // Increase distance for the next check.
+                            distance += 1;
+                            continue;
+                        }
+
+                        break;
+                    }
+                }
+            }
+            ChessPieceType::Queen => {
+                for movable_dir in BoardDir::iter() {
+                    let mut distance = 1;
+                    let (x, y) = movable_dir.as_coords();
+                    loop {
+                        if let Ok(ahead) = from.try_transform(x * distance, y * distance) {
+                            let cell = board.get_cell(&ahead);
+                            match cell.occupant {
+                                Some(entity) => {
+                                    let occupant = pieces.get(entity).unwrap_or_else(|e| {
+                                        panic!("Occupant {} is not a know piece: {:?}", entity, e)
+                                    });
+                                    if occupant.team != piece.team {
+                                        moves.insert(ahead);
+                                        continue;
+                                    }
+                                }
+                                None => {
+                                    moves.insert(ahead);
+                                }
+                            }
+
+                            // Increase distance for the next check.
+                            distance += 1;
+                            continue;
+                        }
+
+                        break;
+                    }
+                }
+            }
+            ChessPieceType::King => {
+                for movable_dir in BoardDir::iter() {
+                    let (x, y) = movable_dir.as_coords();
+                    if let Ok(ahead) = from.try_transform(x, y) {
+                        let cell = board.get_cell(&ahead);
+                        match cell.occupant {
+                            Some(entity) => {
+                                let occupant = pieces.get(entity).unwrap_or_else(|e| {
+                                    panic!("Occupant {} is not a know piece: {:?}", entity, e)
+                                });
+                                if occupant.team != piece.team {
+                                    moves.insert(ahead);
+                                    continue;
+                                }
+                            }
+                            None => {
+                                moves.insert(ahead);
+                            }
+                        }
+
+                        continue;
+                    }
+                }
+            }
+        };
+
+        moves
     }
 }
 pub struct ChessPlugin;
